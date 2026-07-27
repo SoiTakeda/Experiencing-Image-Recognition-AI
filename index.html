@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>スマホAI画像認識ツール Pro (Neural Network版)</title>
-  <!-- TensorFlow.js と MobileNet の読み込み (KNNは不要になったため削除) -->
+  <!-- TensorFlow.js と MobileNet の読み込み -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0"></script>
   <style>
@@ -160,7 +160,7 @@
       height: 100%;
       background: #38bdf8;
       width: 0%;
-      transition: width 0.1s ease-out; /* 1%刻みで動くので少し速めに */
+      transition: width 0.1s ease-out; 
     }
 
     #loading-screen {
@@ -298,7 +298,6 @@
 
     // サンプル画像追加（キャプチャ）
     function captureSample(classId) {
-      // MobileNetの中間層の出力をTensorとして抽出し、配列に保存
       const activation = tf.tidy(() => net.infer(webcamElement, true));
       trainingData.push({ activation, classId });
       
@@ -336,21 +335,16 @@
       progressBg.style.display = 'block';
       progressFill.style.width = '0%';
 
-      // 撮影したデータをテンソルに変換
       const xTensors = trainingData.map(d => d.activation);
       const yTensors = trainingData.map(d => tf.oneHot(tf.tensor1d([d.classId], 'int32'), classes.length));
 
       const xs = tf.concat(xTensors, 0);
       const ys = tf.concat(yTensors, 0);
 
-      // モデルの構築 (Teachable Machineと同じような多層パーセプトロン)
       customModel = tf.sequential({
         layers: [
-          // 入力層 (MobileNetの出力を平坦化)
           tf.layers.flatten({inputShape: net.infer(webcamElement, true).shape.slice(1)}),
-          // 隠れ層
           tf.layers.dense({units: 100, activation: 'relu'}),
-          // 出力層 (クラス数分のSoftmax確率出力 = 1%刻みになる)
           tf.layers.dense({units: classes.length, activation: 'softmax'})
         ]
       });
@@ -361,7 +355,7 @@
         metrics: ['accuracy']
       });
 
-      const epochs = 20; // 学習回数
+      const epochs = 20; 
       await customModel.fit(xs, ys, {
         epochs: epochs,
         callbacks: {
@@ -369,7 +363,7 @@
             const percent = Math.round(((epoch + 1) / epochs) * 100);
             phase2Text.innerText = `AIを学習中... (${percent}%)`;
             progressFill.style.width = `${percent}%`;
-            await tf.nextFrame(); // ブラウザのUI描画を更新
+            await tf.nextFrame(); 
           }
         }
       });
@@ -377,7 +371,6 @@
       phase2Text.innerText = "学習が完了しました！";
       phase3Btn.style.display = 'block';
 
-      // 使用し終わったテンソルのメモリを解放
       xs.dispose();
       ys.dispose();
       yTensors.forEach(t => t.dispose());
@@ -441,17 +434,15 @@
       async function predictionLoop() {
         if (currentPhase === 3 && customModel) {
           try {
-            // メモリリークを防ぐため tf.tidy で囲む
             tf.tidy(() => {
               const activation = net.infer(webcamElement, true);
               const predictions = customModel.predict(activation);
-              const probArray = predictions.dataSync(); // [0.854, 0.146] のような配列を取得
+              const probArray = predictions.dataSync(); 
 
               let detectedClass = null;
               let maxConfAboveThresh = 0;
 
               classes.forEach((c) => {
-                // Softmaxの確率(0.0〜1.0)を100倍して丸めることで、1%刻みになる
                 const prob = probArray[c.id] || 0;
                 const confPct = Math.round(prob * 100);
                 c.confidence = confPct;
@@ -467,10 +458,11 @@
                 }
               });
 
-              // 中央オーバーレイの更新
+              // 中央オーバーレイの更新（パーセンテージ表記を削除）
               const resultEl = document.getElementById('detection-result-text');
               if (detectedClass) {
-                resultEl.innerText = `${detectedClass.name} (${detectedClass.confidence}%)`;
+                // 修正箇所： ${detectedClass.name} のみに変更
+                resultEl.innerText = `${detectedClass.name}`;
                 resultEl.style.color = '#4ade80';
               } else {
                 resultEl.innerText = '検出条件未達成';
