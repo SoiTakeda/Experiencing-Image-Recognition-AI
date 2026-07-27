@@ -341,10 +341,12 @@
       const xs = tf.concat(xTensors, 0);
       const ys = tf.concat(yTensors, 0);
 
+      // 修正箇所: flatten層を削除し、直接inputShapeを指定
+      const featureShape = net.infer(webcamElement, true).shape.slice(1);
+
       customModel = tf.sequential({
         layers: [
-          tf.layers.flatten({inputShape: net.infer(webcamElement, true).shape.slice(1)}),
-          tf.layers.dense({units: 100, activation: 'relu'}),
+          tf.layers.dense({inputShape: featureShape, units: 100, activation: 'relu'}),
           tf.layers.dense({units: classes.length, activation: 'softmax'})
         ]
       });
@@ -458,10 +460,9 @@
                 }
               });
 
-              // 中央オーバーレイの更新（パーセンテージ表記を削除）
+              // 中央オーバーレイの更新（Class名のみを出力）
               const resultEl = document.getElementById('detection-result-text');
               if (detectedClass) {
-                // 修正箇所： ${detectedClass.name} のみに変更
                 resultEl.innerText = `${detectedClass.name}`;
                 resultEl.style.color = '#4ade80';
               } else {
