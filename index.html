@@ -187,9 +187,9 @@
 
   <!-- フェーズインジケーター -->
   <div class="phase-indicator">
-    <div id="tab-1" class="phase-tab active">① 画像撮影</div>
+    <div id="tab-1" class="phase-tab active">① データの準備</div>
     <div id="tab-2" class="phase-tab">② モデル構築</div>
-    <div id="tab-3" class="phase-tab">③ 推論 & しきい値</div>
+    <div id="tab-3" class="phase-tab">③ 検証・しきい値の設定</div>
   </div>
 
   <div class="container">
@@ -225,7 +225,7 @@
         <div id="train-progress-bg" style="display:none; height: 10px; background: #334155; border-radius: 5px; overflow: hidden; margin-bottom: 20px;">
           <div id="train-progress-fill" style="height: 100%; background: #4ade80; width: 0%; transition: width 0.2s;"></div>
         </div>
-        <button id="to-phase-3-btn" class="btn btn-success" style="display: none;">③ リアルタイム推論を開始</button>
+        <button id="to-phase-3-btn" class="btn btn-success" style="display: none;">③ 検証・しきい値の設定へ</button>
       </div>
 
       <!-- ③ 出力フェーズ（推論＆しきい値設定） -->
@@ -301,7 +301,7 @@
             onmouseleave="stopContinuousCapture()"
             ontouchstart="startContinuousCapture(${c.id}, event)" 
             ontouchend="stopContinuousCapture()">
-            📷 長押しで連続撮影
+            長押しで連続撮影
           </button>
         `;
         container.appendChild(card);
