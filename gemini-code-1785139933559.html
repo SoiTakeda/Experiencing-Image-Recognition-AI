@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>スマホAI画像認識ツール Pro</title>
+  <!-- TensorFlow.js と MobileNet / KNN Classifier の読み込み -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier@1.2.4"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px;
+    }
+
+    h1 { font-size: 1.2rem; margin-bottom: 8px; color: #38bdf8; text-align: center; }
+
+    /* フェーズ切替ナビ */
+    .phase-indicator {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      width: 100%;
+      max-width: 480px;
+    }
+    .phase-tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px 4px;
+      font-size: 0.75rem;
+      border-radius: 6px;
+      background-color: #1e293b;
+      color: #64748b;
+      font-weight: bold;
+    }
+    .phase-tab.active { background-color: #0284c7; color: #ffffff; }
+
+    /* メインコンテナ */
+    .container {
+      width: 100%;
+      max-width: 480px;
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    /* カメラエリア */
+    .camera-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background-color: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .detection-overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 2px solid #38bdf8;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+      backdrop-filter: blur(4px);
+      z-index: 10;
+    }
+    .detection-title { font-size: 0.8rem; color: #94a3b8; }
+    .detection-result { font-size: 1.4rem; font-weight: bold; color: #4ade80; margin-top: 2px; }
+
+    /* 操作エリア */
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 8px;
+    }
+    .btn-primary { background-color: #0284c7; color: white; }
+    .btn-primary:disabled { background-color: #334155; color: #64748b; }
+    .btn-success { background-color: #16a34a; color: white; }
+    .btn-capture { background-color: #e11d48; color: white; }
+
+    /* Classコントロール */
+    .class-card {
+      background-color: #0f172a;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #334155;
+    }
+    .class-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .class-name-input {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px dashed #64748b;
+      border-radius: 4px;
+      color: #f8fafc;
+      font-size: 0.95rem;
+      font-weight: bold;
+      padding: 4px 8px;
+      width: 60%;
+    }
+    .class-name-input:focus {
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+      border-color: #38bdf8;
+    }
+    .sample-count { font-size: 0.8rem; color: #38bdf8; }
+
+    /* しきい値スライダー */
+    .threshold-control { margin-top: 8px; }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: #38bdf8;
+      margin-top: 4px;
+    }
+
+    /* 確信度ゲージ */
+    .meter-bar-bg {
+      height: 12px; /* 少し太くして見やすく */
+      background: #334155;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .meter-bar-fill {
+      height: 100%;
+      background: #38bdf8;
+      width: 0%;
+      /* ゲージの動きを滑らかにするため、Transition時間を少し長く設定 */
+      transition: width 0.15s ease-out; 
+    }
+
+    #loading-screen {
+      text-align: center;
+      padding: 20px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>AI Image Threshold Classifier</h1>
+
+  <!-- フェーズインジケーター -->
+  <div class="phase-indicator">
+    <div id="tab-1" class="phase-tab active">① 画像撮影</div>
+    <div id="tab-2" class="phase-tab">② モデル構築</div>
+    <div id="tab-3" class="phase-tab">③ 推論 & しきい値</div>
+  </div>
+
+  <div class="container">
+    <!-- モデル読み込み中画面 -->
+    <div id="loading-screen">
+      AIモデル（MobileNet）を準備中...<br>少々お待ちください。
+    </div>
+
+    <!-- カメラ表示エリア -->
+    <div id="app-content" style="display: none;">
+      <div class="camera-wrapper">
+        <video id="webcam" autoplay playsinline muted></video>
+        <!-- フェーズ3用: 出力オーバーレイ -->
+        <div id="detection-overlay" class="detection-overlay" style="display: none;">
+          <div class="detection-title">判定結果</div>
+          <div id="detection-result-text" class="detection-result">検出なし</div>
+        </div>
+      </div>
+
+      <!-- ① 機械学習フェーズ（撮影） -->
+      <div id="phase-1" class="section active">
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">名前の枠をタップしてClass名を変更できます。</p>
+        <div id="class-cards-container"></div>
+        <button id="add-class-btn" class="btn btn-primary" style="margin-bottom: 8px;">＋ Classを追加 (最大3つ)</button>
+        <button id="to-phase-2-btn" class="btn btn-success" disabled>② モデル構築へ進む</button>
+      </div>
+
+      <!-- ② 画像認識モデル構築フェーズ -->
+      <div id="phase-2" class="section">
+        <p style="text-align: center; margin: 20px 0; font-size: 0.9rem; color: #cbd5e1;">
+          撮影された画像特徴量を抽出し、分類器を構築しました！
+        </p>
+        <button id="to-phase-3-btn" class="btn btn-success">③ リアルタイム推論を開始</button>
+      </div>
+
+      <!-- ③ 出力フェーズ（推論＆しきい値設定） -->
+      <div id="phase-3" class="section">
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">各Classのしきい値(%)を調整してください：</p>
+        <div id="threshold-controls-container"></div>
+        <button id="reset-btn" class="btn btn-primary" style="margin-top: 15px;">最初からやり直す</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // グローバル状態
+    let net;
+    let classifier;
+    let currentPhase = 1;
+    let classes = [
+      { id: 0, name: 'Class 1', count: 0, threshold: 70, confidence: 0 },
+      { id: 1, name: 'Class 2', count: 0, threshold: 70, confidence: 0 }
+    ];
+
+    const webcamElement = document.getElementById('webcam');
+    
+    // 初期化関数
+    async function init() {
+      try {
+        let stream;
+        try {
+          // まず外カメラを「強制(exact)」で起動を試みる
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: 'environment' }, width: { ideal: 640 }, height: { ideal: 640 } },
+            audio: false
+          });
+        } catch (err) {
+          // PCなど外カメラがない環境の場合は、利用可能なカメラを起動する
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 640 }, height: { ideal: 640 } },
+            audio: false
+          });
+        }
+        webcamElement.srcObject = stream;
+
+        // MobileNetとKNN Classifierのロード
+        net = await mobilenet.load();
+        classifier = knnClassifier.create();
+
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('app-content').style.display = 'block';
+
+        renderPhase1();
+        startPredictionLoop();
+      } catch (e) {
+        alert('カメラの起動またはモデルのロードに失敗しました: ' + e.message);
+      }
+    }
+
+    // フェーズ1 UI描画
+    function renderPhase1() {
+      const container = document.getElementById('class-cards-container');
+      container.innerHTML = '';
+
+      classes.forEach((c) => {
+        const card = document.createElement('div');
+        card.className = 'class-card';
+        card.innerHTML = `
+          <div class="class-header">
+            <!-- valueに名前を入れておき、編集可能にしています -->
+            <input type="text" class="class-name-input" value="${c.name}" oninput="updateClassName(${c.id}, this.value)">
+            <span class="sample-count" id="count-${c.id}">枚数: ${c.count}枚</span>
+          </div>
+          <button class="btn btn-capture" onclick="captureSample(${c.id})">📷 このClassを撮影</button>
+        `;
+        container.appendChild(card);
+      });
+
+      // Class追加ボタン制御
+      document.getElementById('add-class-btn').style.display = classes.length >= 3 ? 'none' : 'block';
+      
+      // 次へ進むボタンの活性化判定 (各Class最低1枚)
+      const ready = classes.length >= 2 && classes.every(c => c.count > 0);
+      document.getElementById('to-phase-2-btn').disabled = !ready;
+    }
+
+    // Class名更新
+    function updateClassName(id, name) {
+      const c = classes.find(item => item.id === id);
+      if (c) c.name = name;
+    }
+
+    // サンプル画像追加（キャプチャ）
+    function captureSample(classId) {
+      const activation = net.infer(webcamElement, true);
+      classifier.addExample(activation, classId);
+      
+      const c = classes.find(item => item.id === classId);
+      if (c) {
+        c.count++;
+        document.getElementById(`count-${classId}`).innerText = `枚数: ${c.count}枚`;
+      }
+      
+      const ready = classes.length >= 2 && classes.every(item => item.count > 0);
+      document.getElementById('to-phase-2-btn').disabled = !ready;
+    }
+
+    // Class追加 (最大3)
+    document.getElementById('add-class-btn').addEventListener('click', () => {
+      if (classes.length < 3) {
+        classes.push({ id: classes.length, name: `Class ${classes.length + 1}`, count: 0, threshold: 70, confidence: 0 });
+        renderPhase1();
+      }
+    });
+
+    // フェーズ切り替え処理
+    function switchPhase(phase) {
+      currentPhase = phase;
+      
+      // タブ更新
+      for (let i = 1; i <= 3; i++) {
+        document.getElementById(`tab-${i}`).classList.toggle('active', i === phase);
+        document.getElementById(`phase-${i}`).classList.toggle('active', i === phase);
+      }
+
+      // オーバーレイ表示制御
+      document.getElementById('detection-overlay').style.display = (phase === 3) ? 'block' : 'none';
+
+      if (phase === 3) {
+        renderPhase3();
+      }
+    }
+
+    document.getElementById('to-phase-2-btn').addEventListener('click', () => switchPhase(2));
+    document.getElementById('to-phase-3-btn').addEventListener('click', () => switchPhase(3));
+    document.getElementById('reset-btn').addEventListener('click', () => location.reload());
+
+    // フェーズ3 UI描画 (スライダー・ゲージ)
+    function renderPhase3() {
+      const container = document.getElementById('threshold-controls-container');
+      container.innerHTML = '';
+
+      classes.forEach((c) => {
+        const card = document.createElement('div');
+        card.className = 'class-card';
+        card.innerHTML = `
+          <div class="class-header">
+            <strong>${c.name}</strong>
+            <span id="conf-text-${c.id}" style="font-size:0.85rem; color:#38bdf8;">0%</span>
+          </div>
+          <div class="meter-bar-bg">
+            <div id="meter-fill-${c.id}" class="meter-bar-fill"></div>
+          </div>
+          <div class="threshold-control">
+            <div class="slider-header">
+              <span>判定しきい値</span>
+              <span id="thresh-val-${c.id}">${c.threshold}%</span>
+            </div>
+            <input type="range" min="0" max="100" value="${c.threshold}" 
+              oninput="updateThreshold(${c.id}, this.value)">
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // しきい値変更
+    function updateThreshold(classId, val) {
+      const c = classes.find(item => item.id === classId);
+      if (c) {
+        c.threshold = parseInt(val);
+        document.getElementById(`thresh-val-${classId}`).innerText = `${val}%`;
+      }
+    }
+
+    // リアルタイム推論ループ (ブラウザの描画速度に合わせて高速実行)
+    async function startPredictionLoop() {
+      async function predictionLoop() {
+        if (currentPhase === 3 && classifier.getNumClasses() > 0) {
+          try {
+            // 特徴量を抽出し、分類器で予測
+            const activation = net.infer(webcamElement, true);
+            
+            // 【改善点】KNNのK値を動的に設定する。
+            // 撮影された総サンプル数を取得
+            const totalSamples = classes.reduce((sum, c) => sum + c.count, 0);
+            // K値を「総サンプル数」と「10（目標とする解像度）」の小さい方にする。最低でも3。
+            // これにより、サンプルが増えるほど確信度の出力が細かくなる（最大10段階、サンプルが10枚以上の場合）。
+            const k = Math.min(Math.max(totalSamples, 3), 10); 
+
+            // 第2引数にk値を渡して予測を実行
+            const result = await classifier.predictClass(activation, k);
+
+            let detectedClass = null;
+            let maxConfAboveThresh = 0;
+
+            classes.forEach((c) => {
+              // 確信度の算出 (0~1 -> 0~100%)
+              const prob = result.confidences[c.id] || 0;
+              const confPct = Math.round(prob * 100);
+              c.confidence = confPct;
+
+              // UIのゲージと確信度テキスト更新
+              const fillEl = document.getElementById(`meter-fill-${c.id}`);
+              const textEl = document.getElementById(`conf-text-${c.id}`);
+              if (fillEl) fillEl.style.width = `${confPct}%`;
+              if (textEl) textEl.innerText = `${confPct}%`;
+
+              // しきい値判定 logic
+              if (confPct >= c.threshold && confPct > maxConfAboveThresh) {
+                maxConfAboveThresh = confPct;
+                detectedClass = c;
+              }
+            });
+
+            // 出力フェーズ画面中央の検出テキスト更新
+            const resultEl = document.getElementById('detection-result-text');
+            if (detectedClass) {
+              resultEl.innerText = `${detectedClass.name} (${detectedClass.confidence}%)`;
+              resultEl.style.color = '#4ade80'; // 緑色
+            } else {
+              resultEl.innerText = '検出条件未達成';
+              resultEl.style.color = '#94a3b8'; // グレー
+            }
+          } catch (e) {
+            console.error("推論エラー:", e);
+          }
+        }
+        
+        // requestAnimationFrameを使用して、ブラウザの描画サイクル（約60fps）に合わせて次を実行
+        requestAnimationFrame(predictionLoop);
+      }
+      
+      // ループ開始
+      predictionLoop();
+    }
+
+    // アプリスタート
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
