@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>スマホAI画像認識ツール Pro</title>
-  <!-- TensorFlow.js と MobileNet / KNN Classifier の読み込み -->
+  <title>スマホAI画像認識ツール Pro (Neural Network版)</title>
+  <!-- TensorFlow.js と MobileNet の読み込み (KNNは不要になったため削除) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier@1.2.4"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -151,7 +150,7 @@
 
     /* 確信度ゲージ */
     .meter-bar-bg {
-      height: 12px; /* 少し太くして見やすく */
+      height: 12px;
       background: #334155;
       border-radius: 6px;
       overflow: hidden;
@@ -161,8 +160,7 @@
       height: 100%;
       background: #38bdf8;
       width: 0%;
-      /* ゲージの動きを滑らかにするため、Transition時間を少し長く設定 */
-      transition: width 0.15s ease-out; 
+      transition: width 0.1s ease-out; /* 1%刻みで動くので少し速めに */
     }
 
     #loading-screen {
@@ -184,7 +182,6 @@
   </div>
 
   <div class="container">
-    <!-- モデル読み込み中画面 -->
     <div id="loading-screen">
       AIモデル（MobileNet）を準備中...<br>少々お待ちください。
     </div>
@@ -210,10 +207,14 @@
 
       <!-- ② 画像認識モデル構築フェーズ -->
       <div id="phase-2" class="section">
-        <p style="text-align: center; margin: 20px 0; font-size: 0.9rem; color: #cbd5e1;">
-          撮影された画像特徴量を抽出し、分類器を構築しました！
+        <p id="phase-2-text" style="text-align: center; margin: 20px 0; font-size: 0.9rem; color: #cbd5e1;">
+          構築の準備ができました。
         </p>
-        <button id="to-phase-3-btn" class="btn btn-success">③ リアルタイム推論を開始</button>
+        <!-- 学習プログレスバー -->
+        <div id="train-progress-bg" style="display:none; height: 10px; background: #334155; border-radius: 5px; overflow: hidden; margin-bottom: 20px;">
+          <div id="train-progress-fill" style="height: 100%; background: #4ade80; width: 0%; transition: width 0.2s;"></div>
+        </div>
+        <button id="to-phase-3-btn" class="btn btn-success" style="display: none;">③ リアルタイム推論を開始</button>
       </div>
 
       <!-- ③ 出力フェーズ（推論＆しきい値設定） -->
@@ -228,7 +229,8 @@
   <script>
     // グローバル状態
     let net;
-    let classifier;
+    let customModel; // 独自学習用モデル
+    let trainingData = []; // 撮影した画像の特徴量テンソルを保存する配列
     let currentPhase = 1;
     let classes = [
       { id: 0, name: 'Class 1', count: 0, threshold: 70, confidence: 0 },
@@ -242,13 +244,11 @@
       try {
         let stream;
         try {
-          // まず外カメラを「強制(exact)」で起動を試みる
           stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { exact: 'environment' }, width: { ideal: 640 }, height: { ideal: 640 } },
             audio: false
           });
         } catch (err) {
-          // PCなど外カメラがない環境の場合は、利用可能なカメラを起動する
           stream = await navigator.mediaDevices.getUserMedia({
             video: { width: { ideal: 640 }, height: { ideal: 640 } },
             audio: false
@@ -256,15 +256,13 @@
         }
         webcamElement.srcObject = stream;
 
-        // MobileNetとKNN Classifierのロード
-        net = await mobilenet.load();
-        classifier = knnClassifier.create();
+        // MobileNetのロード (特徴量抽出用)
+        net = await mobilenet.load({version: 2, alpha: 1.0});
 
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('app-content').style.display = 'block';
 
         renderPhase1();
-        startPredictionLoop();
       } catch (e) {
         alert('カメラの起動またはモデルのロードに失敗しました: ' + e.message);
       }
@@ -280,7 +278,6 @@
         card.className = 'class-card';
         card.innerHTML = `
           <div class="class-header">
-            <!-- valueに名前を入れておき、編集可能にしています -->
             <input type="text" class="class-name-input" value="${c.name}" oninput="updateClassName(${c.id}, this.value)">
             <span class="sample-count" id="count-${c.id}">枚数: ${c.count}枚</span>
           </div>
@@ -289,15 +286,11 @@
         container.appendChild(card);
       });
 
-      // Class追加ボタン制御
       document.getElementById('add-class-btn').style.display = classes.length >= 3 ? 'none' : 'block';
-      
-      // 次へ進むボタンの活性化判定 (各Class最低1枚)
       const ready = classes.length >= 2 && classes.every(c => c.count > 0);
       document.getElementById('to-phase-2-btn').disabled = !ready;
     }
 
-    // Class名更新
     function updateClassName(id, name) {
       const c = classes.find(item => item.id === id);
       if (c) c.name = name;
@@ -305,8 +298,9 @@
 
     // サンプル画像追加（キャプチャ）
     function captureSample(classId) {
-      const activation = net.infer(webcamElement, true);
-      classifier.addExample(activation, classId);
+      // MobileNetの中間層の出力をTensorとして抽出し、配列に保存
+      const activation = tf.tidy(() => net.infer(webcamElement, true));
+      trainingData.push({ activation, classId });
       
       const c = classes.find(item => item.id === classId);
       if (c) {
@@ -318,7 +312,6 @@
       document.getElementById('to-phase-2-btn').disabled = !ready;
     }
 
-    // Class追加 (最大3)
     document.getElementById('add-class-btn').addEventListener('click', () => {
       if (classes.length < 3) {
         classes.push({ id: classes.length, name: `Class ${classes.length + 1}`, count: 0, threshold: 70, confidence: 0 });
@@ -326,29 +319,87 @@
       }
     });
 
-    // フェーズ切り替え処理
+    // フェーズ2移行 ＆ モデル学習開始
+    document.getElementById('to-phase-2-btn').addEventListener('click', async () => {
+      switchPhase(2);
+      await trainModel();
+    });
+
+    // 独自のニューラルネットワークを構築して学習する
+    async function trainModel() {
+      const phase2Text = document.getElementById('phase-2-text');
+      const progressBg = document.getElementById('train-progress-bg');
+      const progressFill = document.getElementById('train-progress-fill');
+      const phase3Btn = document.getElementById('to-phase-3-btn');
+      
+      phase2Text.innerText = "AIを学習中... (0%)";
+      progressBg.style.display = 'block';
+      progressFill.style.width = '0%';
+
+      // 撮影したデータをテンソルに変換
+      const xTensors = trainingData.map(d => d.activation);
+      const yTensors = trainingData.map(d => tf.oneHot(tf.tensor1d([d.classId], 'int32'), classes.length));
+
+      const xs = tf.concat(xTensors, 0);
+      const ys = tf.concat(yTensors, 0);
+
+      // モデルの構築 (Teachable Machineと同じような多層パーセプトロン)
+      customModel = tf.sequential({
+        layers: [
+          // 入力層 (MobileNetの出力を平坦化)
+          tf.layers.flatten({inputShape: net.infer(webcamElement, true).shape.slice(1)}),
+          // 隠れ層
+          tf.layers.dense({units: 100, activation: 'relu'}),
+          // 出力層 (クラス数分のSoftmax確率出力 = 1%刻みになる)
+          tf.layers.dense({units: classes.length, activation: 'softmax'})
+        ]
+      });
+
+      customModel.compile({
+        optimizer: tf.train.adam(0.0001),
+        loss: 'categoricalCrossentropy',
+        metrics: ['accuracy']
+      });
+
+      const epochs = 20; // 学習回数
+      await customModel.fit(xs, ys, {
+        epochs: epochs,
+        callbacks: {
+          onEpochEnd: async (epoch, logs) => {
+            const percent = Math.round(((epoch + 1) / epochs) * 100);
+            phase2Text.innerText = `AIを学習中... (${percent}%)`;
+            progressFill.style.width = `${percent}%`;
+            await tf.nextFrame(); // ブラウザのUI描画を更新
+          }
+        }
+      });
+
+      phase2Text.innerText = "学習が完了しました！";
+      phase3Btn.style.display = 'block';
+
+      // 使用し終わったテンソルのメモリを解放
+      xs.dispose();
+      ys.dispose();
+      yTensors.forEach(t => t.dispose());
+    }
+
+    document.getElementById('to-phase-3-btn').addEventListener('click', () => {
+      switchPhase(3);
+      startPredictionLoop();
+    });
+
     function switchPhase(phase) {
       currentPhase = phase;
-      
-      // タブ更新
       for (let i = 1; i <= 3; i++) {
         document.getElementById(`tab-${i}`).classList.toggle('active', i === phase);
         document.getElementById(`phase-${i}`).classList.toggle('active', i === phase);
       }
-
-      // オーバーレイ表示制御
       document.getElementById('detection-overlay').style.display = (phase === 3) ? 'block' : 'none';
-
-      if (phase === 3) {
-        renderPhase3();
-      }
+      if (phase === 3) renderPhase3();
     }
 
-    document.getElementById('to-phase-2-btn').addEventListener('click', () => switchPhase(2));
-    document.getElementById('to-phase-3-btn').addEventListener('click', () => switchPhase(3));
     document.getElementById('reset-btn').addEventListener('click', () => location.reload());
 
-    // フェーズ3 UI描画 (スライダー・ゲージ)
     function renderPhase3() {
       const container = document.getElementById('threshold-controls-container');
       container.innerHTML = '';
@@ -377,7 +428,6 @@
       });
     }
 
-    // しきい値変更
     function updateThreshold(classId, val) {
       const c = classes.find(item => item.id === classId);
       if (c) {
@@ -386,69 +436,56 @@
       }
     }
 
-    // リアルタイム推論ループ (ブラウザの描画速度に合わせて高速実行)
+    // リアルタイム推論ループ
     async function startPredictionLoop() {
       async function predictionLoop() {
-        if (currentPhase === 3 && classifier.getNumClasses() > 0) {
+        if (currentPhase === 3 && customModel) {
           try {
-            // 特徴量を抽出し、分類器で予測
-            const activation = net.infer(webcamElement, true);
-            
-            // 【改善点】KNNのK値を動的に設定する。
-            // 撮影された総サンプル数を取得
-            const totalSamples = classes.reduce((sum, c) => sum + c.count, 0);
-            // K値を「総サンプル数」と「10（目標とする解像度）」の小さい方にする。最低でも3。
-            // これにより、サンプルが増えるほど確信度の出力が細かくなる（最大10段階、サンプルが10枚以上の場合）。
-            const k = Math.min(Math.max(totalSamples, 3), 10); 
+            // メモリリークを防ぐため tf.tidy で囲む
+            tf.tidy(() => {
+              const activation = net.infer(webcamElement, true);
+              const predictions = customModel.predict(activation);
+              const probArray = predictions.dataSync(); // [0.854, 0.146] のような配列を取得
 
-            // 第2引数にk値を渡して予測を実行
-            const result = await classifier.predictClass(activation, k);
+              let detectedClass = null;
+              let maxConfAboveThresh = 0;
 
-            let detectedClass = null;
-            let maxConfAboveThresh = 0;
+              classes.forEach((c) => {
+                // Softmaxの確率(0.0〜1.0)を100倍して丸めることで、1%刻みになる
+                const prob = probArray[c.id] || 0;
+                const confPct = Math.round(prob * 100);
+                c.confidence = confPct;
 
-            classes.forEach((c) => {
-              // 確信度の算出 (0~1 -> 0~100%)
-              const prob = result.confidences[c.id] || 0;
-              const confPct = Math.round(prob * 100);
-              c.confidence = confPct;
+                const fillEl = document.getElementById(`meter-fill-${c.id}`);
+                const textEl = document.getElementById(`conf-text-${c.id}`);
+                if (fillEl) fillEl.style.width = `${confPct}%`;
+                if (textEl) textEl.innerText = `${confPct}%`;
 
-              // UIのゲージと確信度テキスト更新
-              const fillEl = document.getElementById(`meter-fill-${c.id}`);
-              const textEl = document.getElementById(`conf-text-${c.id}`);
-              if (fillEl) fillEl.style.width = `${confPct}%`;
-              if (textEl) textEl.innerText = `${confPct}%`;
+                if (confPct >= c.threshold && confPct > maxConfAboveThresh) {
+                  maxConfAboveThresh = confPct;
+                  detectedClass = c;
+                }
+              });
 
-              // しきい値判定 logic
-              if (confPct >= c.threshold && confPct > maxConfAboveThresh) {
-                maxConfAboveThresh = confPct;
-                detectedClass = c;
+              // 中央オーバーレイの更新
+              const resultEl = document.getElementById('detection-result-text');
+              if (detectedClass) {
+                resultEl.innerText = `${detectedClass.name} (${detectedClass.confidence}%)`;
+                resultEl.style.color = '#4ade80';
+              } else {
+                resultEl.innerText = '検出条件未達成';
+                resultEl.style.color = '#94a3b8';
               }
             });
-
-            // 出力フェーズ画面中央の検出テキスト更新
-            const resultEl = document.getElementById('detection-result-text');
-            if (detectedClass) {
-              resultEl.innerText = `${detectedClass.name} (${detectedClass.confidence}%)`;
-              resultEl.style.color = '#4ade80'; // 緑色
-            } else {
-              resultEl.innerText = '検出条件未達成';
-              resultEl.style.color = '#94a3b8'; // グレー
-            }
           } catch (e) {
             console.error("推論エラー:", e);
           }
         }
-        
-        // requestAnimationFrameを使用して、ブラウザの描画サイクル（約60fps）に合わせて次を実行
         requestAnimationFrame(predictionLoop);
       }
-      
-      // ループ開始
       predictionLoop();
     }
 
-    // アプリスタート
     window.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
