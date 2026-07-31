@@ -18,23 +18,25 @@
       align-items: center;
       height: 100dvh; 
       overflow: hidden; 
-      padding: 12px;
+      /* スマホの操作領域を広げるため、上下の余白を削減 */
+      padding: 6px 10px 10px 10px; 
     }
 
+    /* タイトル部分をスリム化 */
     h1 { 
-      font-size: 1.3rem; 
-      margin-bottom: 12px; 
+      font-size: 1.1rem; 
+      margin-bottom: 6px; 
       color: #0284c7; 
       text-align: center; 
       letter-spacing: 0.5px;
       flex-shrink: 0;
     }
 
-    /* フェーズ切替ナビ */
+    /* フェーズ切替ナビをスリム化 */
     .phase-indicator {
       display: flex;
-      gap: 6px;
-      margin-bottom: 12px;
+      gap: 4px;
+      margin-bottom: 8px;
       width: 100%;
       max-width: 480px;
       flex-shrink: 0;
@@ -42,8 +44,8 @@
     .phase-tab {
       flex: 1;
       text-align: center;
-      padding: 8px 4px;
-      font-size: 0.75rem;
+      padding: 6px 2px;
+      font-size: 0.7rem;
       border-radius: 6px;
       background-color: #e2e8f0;
       color: #64748b;
@@ -57,7 +59,7 @@
       max-width: 480px;
       background: #ffffff;
       border-radius: 12px;
-      padding: 12px;
+      padding: 10px; /* パディングを少し減らす */
       box-shadow: 0 4px 12px rgba(0,0,0,0.08);
       display: flex;
       flex-direction: column;
@@ -80,7 +82,7 @@
       background-color: #000;
       border-radius: 8px;
       overflow: hidden;
-      margin-bottom: 12px;
+      margin-bottom: 10px; /* 余白削減 */
       flex-shrink: 0; 
     }
     video {
@@ -96,13 +98,13 @@
       background: rgba(255, 255, 255, 0.9);
       border: 2px solid #0284c7;
       border-radius: 8px;
-      padding: 10px;
+      padding: 8px;
       text-align: center;
       backdrop-filter: blur(4px);
       z-index: 10;
     }
-    .detection-title { font-size: 0.8rem; color: #64748b; }
-    .detection-result { font-size: 1.4rem; font-weight: bold; color: #16a34a; margin-top: 2px; }
+    .detection-title { font-size: 0.75rem; color: #64748b; }
+    .detection-result { font-size: 1.2rem; font-weight: bold; color: #16a34a; margin-top: 2px; }
 
     /* 操作エリア */
     .section { 
@@ -117,7 +119,7 @@
     /* 共通ボタン設定 */
     .btn {
       width: 100%;
-      padding: 12px;
+      padding: 10px; /* 少しスリムに */
       border: none;
       border-radius: 8px;
       font-weight: bold;
@@ -163,7 +165,7 @@
       user-select: none; 
       -webkit-user-select: none;
       -webkit-touch-callout: none;
-      padding: 8px 24px;
+      padding: 8px 20px;
       font-size: 0.85rem;
       font-weight: bold;
       border-radius: 20px; 
@@ -335,7 +337,7 @@
 
       <!-- ① 機械学習フェーズ -->
       <div id="phase-1" class="section active">
-        <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">名前の枠をタップしてClass名を変更できます。</p>
+        <p style="font-size: 0.75rem; color: #64748b; margin-bottom: 8px;">名前の枠をタップしてClass名を変更できます。</p>
         <div id="class-cards-container"></div>
         <button id="add-class-btn" class="btn btn-primary" style="margin-bottom: 8px;">＋ Classを追加 (最大3つ)</button>
         <button id="to-phase-2-btn" class="btn btn-success" disabled>② モデル構築へ進む</button>
@@ -354,7 +356,7 @@
 
       <!-- ③ 出力フェーズ -->
       <div id="phase-3" class="section">
-        <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">各Classのしきい値(%)を調整してください：</p>
+        <p style="font-size: 0.75rem; color: #64748b; margin-bottom: 8px;">各Classのしきい値(%)を調整してください：</p>
         <div id="threshold-controls-container"></div>
         <button id="reset-btn" class="btn btn-primary" style="margin-top: 15px;">最初からやり直す</button>
       </div>
@@ -426,7 +428,6 @@
         const card = document.createElement('div');
         card.className = 'class-card';
         
-        // onclickを showResetModal に変更
         card.innerHTML = `
           <div class="class-header">
             <input type="text" class="class-name-input" value="${c.name}" oninput="updateClassName(${c.id}, this.value)">
@@ -488,7 +489,7 @@
       }
 
       updateToPhase2Btn();
-      closeResetModal(); // モーダルを閉じる
+      closeResetModal(); 
     }
 
     // 連続撮影の開始
