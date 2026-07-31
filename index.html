@@ -102,31 +102,35 @@
       margin-top: 8px;
       display: block;
       text-align: center;
-      /* 全ボタン共通のエフェクト設定 */
       box-shadow: 0 4px 6px rgba(0,0,0,0.3);
       transition: all 0.1s ease-out;
     }
 
-    /* 全ボタン共通の押し込みエフェクト */
     .btn:active:not(:disabled) {
       transform: scale(0.95);
       box-shadow: 0 1px 2px rgba(0,0,0,0.3);
     }
 
-    /* 各ボタンの色と、押した時の色（少し濃くする） */
     .btn-primary { background-color: #0284c7; color: white; }
     .btn-primary:active:not(:disabled) { background-color: #0369a1; }
     
     .btn-success { background-color: #16a34a; color: white; }
     .btn-success:active:not(:disabled) { background-color: #15803d; }
     
-    /* 無効時のスタイル */
     .btn:disabled { 
       background-color: #334155; 
       color: #64748b; 
       box-shadow: none; 
       cursor: not-allowed; 
       transform: none; 
+    }
+
+    /* 各クラスのアクションボタンを並べるレイアウト */
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      justify-content: center;
     }
 
     /* 撮影ボタン (誤タップ防止で小さくスマートに) */
@@ -136,15 +140,35 @@
       user-select: none; 
       -webkit-user-select: none;
       -webkit-touch-callout: none;
-      width: max-content; 
-      margin: 8px auto 0; 
       padding: 8px 24px;
       font-size: 0.85rem;
+      font-weight: bold;
       border-radius: 20px; 
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      transition: all 0.1s ease-out;
+      cursor: pointer;
     }
     .btn-capture:active {
-      transform: scale(0.92); /* 撮影ボタンだけ少し深めに沈むように設定 */
+      transform: scale(0.92);
       background-color: #be123c;
+    }
+
+    /* 撮り直すボタン */
+    .btn-retake {
+      background-color: #64748b;
+      color: white;
+      user-select: none;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      border-radius: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      transition: all 0.1s ease-out;
+      cursor: pointer;
+    }
+    .btn-retake:active {
+      transform: scale(0.92);
+      background-color: #475569;
     }
 
     /* Classコントロール */
@@ -216,7 +240,6 @@
 </head>
 <body>
 
-  <!-- タイトルを Image Recognition AI Maker に統一 -->
   <h1>Image Recognition AI Maker</h1>
 
   <!-- フェーズインジケーター -->
@@ -323,24 +346,56 @@
         const card = document.createElement('div');
         card.className = 'class-card';
         
+        // 撮影ボタンと撮り直すボタンを横並びに配置
         card.innerHTML = `
           <div class="class-header">
             <input type="text" class="class-name-input" value="${c.name}" oninput="updateClassName(${c.id}, this.value)">
             <span class="sample-count" id="count-${c.id}">枚数: ${c.count}枚</span>
           </div>
-          <div class="btn btn-capture" 
-            onmousedown="startContinuousCapture(${c.id}, event)" 
-            onmouseup="stopContinuousCapture()" 
-            onmouseleave="stopContinuousCapture()"
-            ontouchstart="startContinuousCapture(${c.id}, event)" 
-            ontouchend="stopContinuousCapture()">
-            長押しで連続撮影
+          <div class="action-buttons">
+            <div class="btn-capture" 
+              onmousedown="startContinuousCapture(${c.id}, event)" 
+              onmouseup="stopContinuousCapture()" 
+              onmouseleave="stopContinuousCapture()"
+              ontouchstart="startContinuousCapture(${c.id}, event)" 
+              ontouchend="stopContinuousCapture()">
+              長押しで連続撮影
+            </div>
+            <div class="btn-retake" onclick="resetClassSamples(${c.id})">
+              撮り直す
+            </div>
           </div>
         `;
         container.appendChild(card);
       });
 
       document.getElementById('add-class-btn').style.display = classes.length >= 3 ? 'none' : 'block';
+      updateToPhase2Btn();
+    }
+
+    // クラスごとの撮影データをリセットする機能
+    function resetClassSamples(classId) {
+      if (!confirm(`本当に「${classes.find(c => c.id === classId).name}」の画像を全て削除して撮り直しますか？`)) {
+        return;
+      }
+
+      // メモリリークを防ぐため、該当クラスのテンソルを破棄
+      trainingData.forEach(item => {
+        if (item.classId === classId) {
+          item.activation.dispose();
+        }
+      });
+
+      // 該当クラスのデータを配列から除外
+      trainingData = trainingData.filter(item => item.classId !== classId);
+
+      // カウントを0に戻す
+      const c = classes.find(item => item.id === classId);
+      if (c) {
+        c.count = 0;
+        document.getElementById(`count-${classId}`).innerText = `枚数: 0枚`;
+      }
+
       updateToPhase2Btn();
     }
 
@@ -504,7 +559,7 @@
       }
     }
 
-    // リアルタイム推論ループ (0.5秒周期)
+    // リアルタイム推論ループ
     let lastPredictionTime = 0;
 
     async function startPredictionLoop() {
