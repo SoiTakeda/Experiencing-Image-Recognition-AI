@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>スマホAI画像認識ツール Pro (Neural Network版)</title>
+  <title>Image Recognition AI Maker</title>
   <!-- TensorFlow.js と MobileNet の読み込み -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0"></script>
@@ -20,7 +20,7 @@
       padding: 12px;
     }
 
-    h1 { font-size: 1.2rem; margin-bottom: 8px; color: #38bdf8; text-align: center; }
+    h1 { font-size: 1.3rem; margin-bottom: 12px; color: #38bdf8; text-align: center; letter-spacing: 0.5px;}
 
     /* フェーズ切替ナビ */
     .phase-indicator {
@@ -216,7 +216,8 @@
 </head>
 <body>
 
-  <h1>AI Image Threshold Classifier</h1>
+  <!-- タイトルを Image Recognition AI Maker に統一 -->
+  <h1>Image Recognition AI Maker</h1>
 
   <!-- フェーズインジケーター -->
   <div class="phase-indicator">
@@ -503,7 +504,7 @@
       }
     }
 
-    // リアルタイム推論ループ (0.5秒周期に変更)
+    // リアルタイム推論ループ (0.5秒周期)
     let lastPredictionTime = 0;
 
     async function startPredictionLoop() {
