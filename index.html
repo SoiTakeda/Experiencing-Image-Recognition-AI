@@ -18,14 +18,14 @@
       align-items: center;
       height: 100dvh; 
       overflow: hidden; 
-      /* スマホの操作領域を広げるため、上下の余白を削減 */
-      padding: 6px 10px 10px 10px; 
+      /* 上部の余白をさらに削減 */
+      padding: 4px 10px 10px 10px; 
     }
 
-    /* タイトル部分をスリム化 */
+    /* タイトル部分をさらにスリム化 */
     h1 { 
       font-size: 1.1rem; 
-      margin-bottom: 6px; 
+      margin-bottom: 4px; 
       color: #0284c7; 
       text-align: center; 
       letter-spacing: 0.5px;
@@ -36,20 +36,26 @@
     .phase-indicator {
       display: flex;
       gap: 4px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       width: 100%;
       max-width: 480px;
       flex-shrink: 0;
     }
+    
+    /* タブの高さを狭め、テキストを縦横中央揃えに修正 */
     .phase-tab {
       flex: 1;
+      display: flex;
+      align-items: center;        /* 縦方向の中央揃え */
+      justify-content: center;    /* 横方向の中央揃え */
       text-align: center;
-      padding: 6px 2px;
+      padding: 4px 2px;           /* 上下の余白を削減して高さを狭める */
       font-size: 0.7rem;
       border-radius: 6px;
       background-color: #e2e8f0;
       color: #64748b;
       font-weight: bold;
+      line-height: 1.2;           /* 2行になった時の行間を詰める */
     }
     .phase-tab.active { background-color: #0284c7; color: #ffffff; }
 
@@ -59,7 +65,7 @@
       max-width: 480px;
       background: #ffffff;
       border-radius: 12px;
-      padding: 10px; /* パディングを少し減らす */
+      padding: 10px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.08);
       display: flex;
       flex-direction: column;
@@ -82,7 +88,7 @@
       background-color: #000;
       border-radius: 8px;
       overflow: hidden;
-      margin-bottom: 10px; /* 余白削減 */
+      margin-bottom: 10px;
       flex-shrink: 0; 
     }
     video {
@@ -119,7 +125,7 @@
     /* 共通ボタン設定 */
     .btn {
       width: 100%;
-      padding: 10px; /* 少しスリムに */
+      padding: 10px;
       border: none;
       border-radius: 8px;
       font-weight: bold;
