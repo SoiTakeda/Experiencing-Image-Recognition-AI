@@ -90,6 +90,7 @@
     .section { display: none; }
     .section.active { display: block; }
 
+    /* 共通ボタン設定 */
     .btn {
       width: 100%;
       padding: 12px;
@@ -98,35 +99,52 @@
       font-weight: bold;
       font-size: 0.95rem;
       cursor: pointer;
-      transition: background 0.2s;
       margin-top: 8px;
+      display: block;
+      text-align: center;
+      /* 全ボタン共通のエフェクト設定 */
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      transition: all 0.1s ease-out;
     }
+
+    /* 全ボタン共通の押し込みエフェクト */
+    .btn:active:not(:disabled) {
+      transform: scale(0.95);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    /* 各ボタンの色と、押した時の色（少し濃くする） */
     .btn-primary { background-color: #0284c7; color: white; }
-    .btn-primary:disabled { background-color: #334155; color: #64748b; }
-    .btn-success { background-color: #16a34a; color: white; }
+    .btn-primary:active:not(:disabled) { background-color: #0369a1; }
     
-    /* 撮影ボタン (誤タップ防止で小さく、エフェクトを追加) */
+    .btn-success { background-color: #16a34a; color: white; }
+    .btn-success:active:not(:disabled) { background-color: #15803d; }
+    
+    /* 無効時のスタイル */
+    .btn:disabled { 
+      background-color: #334155; 
+      color: #64748b; 
+      box-shadow: none; 
+      cursor: not-allowed; 
+      transform: none; 
+    }
+
+    /* 撮影ボタン (誤タップ防止で小さくスマートに) */
     .btn-capture { 
       background-color: #e11d48; 
       color: white; 
       user-select: none; 
       -webkit-user-select: none;
       -webkit-touch-callout: none;
-      /* 以下、形状とアニメーションの調整 */
-      width: max-content; /* 文字の長さに合わせる */
-      margin: 8px auto 0; /* 中央寄せ */
+      width: max-content; 
+      margin: 8px auto 0; 
       padding: 8px 24px;
       font-size: 0.85rem;
-      border-radius: 20px; /* 丸みをつける */
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3); /* 影で立体感を出す */
-      transition: all 0.1s ease-out; /* エフェクトの速度 */
-      display: block;
+      border-radius: 20px; 
     }
-    /* 押された瞬間のエフェクト */
     .btn-capture:active {
-      transform: scale(0.92); /* 少し縮む */
-      box-shadow: 0 1px 2px rgba(0,0,0,0.3); /* 影を小さくして沈むように見せる */
-      background-color: #be123c; /* 色を少し濃くする */
+      transform: scale(0.92); /* 撮影ボタンだけ少し深めに沈むように設定 */
+      background-color: #be123c;
     }
 
     /* Classコントロール */
@@ -186,7 +204,6 @@
       height: 100%;
       background: #38bdf8;
       width: 0%;
-      /* 0.5秒周期に合わせて動きを少し滑らかに調整 */
       transition: width 0.3s ease-out; 
     }
 
@@ -493,7 +510,6 @@
       async function predictionLoop(timestamp) {
         if (currentPhase === 3 && customModel) {
           
-          // 前回の実行から500ms(0.5秒)経過しているかチェック
           if (timestamp - lastPredictionTime >= 500) {
             lastPredictionTime = timestamp;
 
@@ -536,10 +552,8 @@
             }
           }
         }
-        // 次の描画タイミングで再度ループを呼び出す
         requestAnimationFrame(predictionLoop);
       }
-      // ループ開始
       requestAnimationFrame(predictionLoop);
     }
 
