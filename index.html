@@ -18,11 +18,9 @@
       align-items: center;
       height: 100dvh; 
       overflow: hidden; 
-      /* 上部の余白をさらに削減 */
       padding: 4px 10px 10px 10px; 
     }
 
-    /* タイトル部分をさらにスリム化 */
     h1 { 
       font-size: 1.1rem; 
       margin-bottom: 4px; 
@@ -32,7 +30,7 @@
       flex-shrink: 0;
     }
 
-    /* フェーズ切替ナビをスリム化 */
+    /* フェーズ切替ナビ */
     .phase-indicator {
       display: flex;
       gap: 4px;
@@ -42,20 +40,21 @@
       flex-shrink: 0;
     }
     
-    /* タブの高さを狭め、テキストを縦横中央揃えに修正 */
+    /* タブを1行に収めるための微調整 */
     .phase-tab {
       flex: 1;
       display: flex;
-      align-items: center;        /* 縦方向の中央揃え */
-      justify-content: center;    /* 横方向の中央揃え */
+      align-items: center;        
+      justify-content: center;    
       text-align: center;
-      padding: 4px 2px;           /* 上下の余白を削減して高さを狭める */
-      font-size: 0.7rem;
+      padding: 4px 2px;           
+      font-size: 0.65rem;         /* 1行に収まるように少し縮小 */
+      letter-spacing: -0.2px;     /* 文字間隔を少し詰める */
+      white-space: nowrap;        /* 絶対に改行させない指定 */
       border-radius: 6px;
       background-color: #e2e8f0;
       color: #64748b;
       font-weight: bold;
-      line-height: 1.2;           /* 2行になった時の行間を詰める */
     }
     .phase-tab.active { background-color: #0284c7; color: #ffffff; }
 
@@ -323,7 +322,7 @@
   <div class="phase-indicator">
     <div id="tab-1" class="phase-tab active">① データの準備</div>
     <div id="tab-2" class="phase-tab">② モデル構築</div>
-    <div id="tab-3" class="phase-tab">③ 検証・しきい値の設定</div>
+    <div id="tab-3" class="phase-tab">③ 検証・しきい値設定</div>
   </div>
 
   <div class="container">
@@ -357,7 +356,7 @@
         <div id="train-progress-bg" style="display:none; height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; margin-bottom: 20px;">
           <div id="train-progress-fill" style="height: 100%; background: #16a34a; width: 0%; transition: width 0.2s;"></div>
         </div>
-        <button id="to-phase-3-btn" class="btn btn-success" style="display: none;">③ 検証・しきい値の設定へ</button>
+        <button id="to-phase-3-btn" class="btn btn-success" style="display: none;">③ 検証・しきい値設定へ</button>
       </div>
 
       <!-- ③ 出力フェーズ -->
